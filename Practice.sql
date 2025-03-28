@@ -55,7 +55,6 @@ HAVING AVG(salary > 75000)
 ;
 
 -- LIMIT and ALIASING
-
 SELECT *
 FROM employee_demographics
 ORDER BY age DESC
@@ -162,6 +161,118 @@ FROM employee_demographics;
 SELECT first_name, last_name,
 CONCAT(first_name,' ',last_name) AS full_name
 FROM employee_demographics;
+
+-- case statements
+SELECT first_name,
+last_name,
+CASE
+	WHEN age <= 30 THEN 'Young'
+    WHEN age BETWEEN 31 and 50 THEN 'Old'
+    WHEN age >= 50 THEN "On Death's Door"
+END AS Age_Bracket
+FROM employee_demographics;
+
+SELECT *
+FROM employee_salary;
+
+-- Pay Increase and Bonus
+-- < 50000 = 5%
+-- > 50000 = 7%
+-- Finance = 10% bonus
+
+SELECT first_name, last_name, salary,
+CASE
+	WHEN salary < 50000 THEN salary + (salary * 0.05)
+	WHEN salary > 50000 THEN salary + (salary * 0.07)
+END AS New_Salary,
+CASE
+	WHEN dept_id = 6 THEN salary * .10
+END AS Bonus
+FROM employee_salary;
+
+SELECT *
+FROM employee_salary;
+SELECT *
+FROM parks_departments;
+
+-- Subqueries
+SELECT *
+FROM employee_demographics
+WHERE employee_id IN
+				( SELECT employee_id
+					FROM employee_salary
+                    WHERE dept_id = 1)
+;
+
+SELECT first_name, salary,
+(SELECT AVG(salary)
+FROM employee_salary)
+FROM employee_salary;
+
+SELECT gender, AVG(age), MAX(age), MIN(age), COUNT(age)
+FROM employee_demographics
+GROUP BY gender;
+
+SELECT AVG(max_age)
+FROM 
+(SELECT gender,
+AVG(age) AS avg_age,
+MAX(age) AS max_age,
+MIN(age) AS min_age,
+COUNT(age)
+FROM employee_demographics
+GROUP BY gender) AS agg_table
+;
+
+-- Window Functions
+SELECT gender, AVG(salary) AS avg_salary
+FROM employee_demographics dem
+JOIN employee_salary sal
+	ON dem.employee_id = sal.employee_id
+GROUP BY gender
+;
+
+-- (partition by will seperate the genders kinda like group by **but is independent of other columns**)
+-- SUM _ OVER_ (PARTITION BY _ ORDER BY _) creates a rolling total
+SELECT dem.first_name, dem.last_name, gender, salary,
+SUM(salary) OVER(PARTITION BY gender ORDER BY dem.employee_id) AS Rolling_Total
+FROM employee_demographics dem
+JOIN employee_salary sal
+	ON dem.employee_id = sal.employee_id
+;
+
+-- ROW_NUMBER (numbers) and RANK (allows for duplicates, gives next number positionally) and DENSE_RANK (duplicates but gives next num numerically)
+SELECT dem.employee_id, dem.first_name, dem.last_name, gender, salary,
+ROW_NUMBER() OVER(PARTITION BY gender ORDER BY salary DESC) as row_num,
+RANK() OVER(PARTITION BY gender ORDER BY salary DESC) as rank_num,
+DENSE_RANK() OVER(PARTITION BY gender ORDER BY salary DESC) as dense_rank_num
+FROM employee_demographics dem
+JOIN employee_salary sal
+	ON dem.employee_id = sal.employee_id
+;
+
+-- CTEs (common table expression)
+WITH CTE_Example AS 
+(
+SELECT gender, AVG(salary), MAX(salary), MIN(salary), COUNT(salary)
+FROM employee_demographics dem
+JOIN employee_salary sal
+	ON dem.employee_id = sal.employee_id
+GROUP BY gender
+
+)
+;
+
+
+
+
+
+
+
+
+
+
+
 
 
 
