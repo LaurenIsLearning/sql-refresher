@@ -251,29 +251,134 @@ JOIN employee_salary sal
 	ON dem.employee_id = sal.employee_id
 ;
 
--- CTEs (common table expression)
+-- CTEs (common table expression (temp local storage))
 WITH CTE_Example AS 
 (
-SELECT gender, AVG(salary), MAX(salary), MIN(salary), COUNT(salary)
+SELECT gender, AVG(salary) avg_sal, MAX(salary) max_sal, MIN(salary) min_sal, COUNT(salary) count_sal
 FROM employee_demographics dem
 JOIN employee_salary sal
 	ON dem.employee_id = sal.employee_id
 GROUP BY gender
-
 )
+SELECT AVG(avg_sal)
+FROM CTE_Example
 ;
 
+-- can also default column names with parameters
+WITH CTE_Example (Gender, AVG_sal, MAX_sal, MIN_sal, COUNT_sal) AS 
+(
+SELECT gender, AVG(salary) avg_sal, MAX(salary) max_sal, MIN(salary) min_sal, COUNT(salary) count_sal
+FROM employee_demographics dem
+JOIN employee_salary sal
+	ON dem.employee_id = sal.employee_id
+GROUP BY gender
+)
+SELECT *
+FROM CTE_Example
+;
 
+-- (example of CTE as subquery instead to see more difficult syntax)
+-- CTEs are PREFERRED!
+SELECT AVG(avg_sal)
+FROM (
+SELECT gender, AVG(salary) avg_sal, MAX(salary) max_sal, MIN(salary) min_sal, COUNT(salary) count_sal
+FROM employee_demographics dem
+JOIN employee_salary sal
+	ON dem.employee_id = sal.employee_id
+GROUP BY gender
+) example_subquery
+;
 
+-- Multiple CTEs and join them
+WITH CTE_Example AS 
+(
+SELECT employee_id, gender, birth_date
+FROM employee_demographics dem
+WHERE birth_date > '1985-01-01'
+),
+CTE_Example2 AS
+(
+SELECT employee_id, salary
+FROM employee_salary
+WHERE salary > 50000
+)
+SELECT *
+FROM CTE_Example
+JOIN CTE_Example2
+	ON CTE_Example.employee_id = CTE_Example2.employee_id
+;
 
+-- Temporary Tables (only visible in current session)
+-- used for storing intermediate results for complex queries AND to manipulate data before inputting
 
+-- (not as popular way)
+CREATE TEMPORARY TABLE temp_table
+(
+first_name varchar(50),
+last_name varchar(50),
+favorite_movie varchar(100)
+);
 
+SELECT *
+FROM temp_table;
 
+INSERT INTO temp_table
+VALUES('Lauren', 'Robison', 'Matrix');
 
+SELECT *
+FROM temp_table;
 
+-- How typically done
+SELECT *
+FROM employee_salary;
 
+CREATE TEMPORARY TABLE salary_over_50k
+SELECT *
+FROM employee_salary
+WHERE salary >= 50000
+;
 
+SELECT *
+FROM salary_over_50k;
 
+-- Stored Procedures
+SELECT *
+FROM employee_salary
+WHERE salary >= 50000;
 
+CREATE PROCEDURE large_salaries()
+SELECT *
+FROM employee_salary
+WHERE salary >= 50000;
 
+CALL large_salaries();
+
+-- Better practice of stored procedure:
+-- (; is default delimiter)
+DELIMITER $$
+CREATE PROCEDURE large_salaries3()
+BEGIN
+	SELECT *
+	FROM employee_salary
+	WHERE salary >= 50000;
+	SELECT *
+	FROM employee_salary
+	WHERE salary >= 10000;
+END $$
+DELIMITER ;
+
+-- (gets two result tables)
+CALL large_salaries3();
+
+-- parameters in procedure
+DELIMITER $$
+CREATE PROCEDURE large_salaries4(employee_id_param INT)
+BEGIN
+	SELECT salary
+	FROM employee_salary
+    WHERE employee_id = employee_id_param;
+END $$
+DELIMITER ;
+
+CALL large_salaries4(1);
 
