@@ -112,8 +112,167 @@ FROM Company_Year_Rank
 WHERE Ranking <= 5;
 
 -- find total of people before layoff
+SELECT *
+FROM layoffs_staging2;
+
+SELECT *
+FROM layoffs_staging2
+WHERE percentage_laid_off = 0;
+
+WITH Total_Before_Layoff AS
+(
+SELECT company,
+	location,
+    industry,
+    total_laid_off,
+    percentage_laid_off,
+    CASE
+		WHEN total_laid_off IS NOT NULL
+			AND percentage_laid_OFF IS NOT NULL
+            AND percentage_laid_off != 0
+		THEN ROUND(total_laid_off / percentage_laid_off,2)
+	END AS total_before_layoff,
+    `date`,
+    stage,
+    country,
+    funds_raised_millions
+FROM layoffs_staging2
+)
+SELECT *
+FROM Total_Before_Layoff;
+
+CREATE TABLE `layoffs_staging3` (
+  `company` text,
+  `location` text,
+  `industry` text,
+  `total_laid_off` int DEFAULT NULL,
+  `percentage_laid_off` text,
+  `total_before_layoff` INT,
+  `date` date DEFAULT NULL,
+  `stage` text,
+  `country` text,
+  `funds_raised_millions` int DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- new table made that includes total of people before layoff! yay!
+
+SELECT *
+FROM layoffs_staging3;
+
+INSERT INTO layoffs_staging3
+SELECT company,
+	location,
+    industry,
+    total_laid_off,
+    percentage_laid_off,
+    CASE
+		WHEN total_laid_off IS NOT NULL
+			AND percentage_laid_OFF IS NOT NULL
+            AND percentage_laid_off != 0
+		THEN ROUND(total_laid_off / percentage_laid_off,2)
+	END AS total_before_layoff,
+    `date`,
+    stage,
+    country,
+    funds_raised_millions
+FROM layoffs_staging2;
+
+-- FUNDING EFFICIENCY
+-- did companies with more money per person still lay people off (per year)
+
+SELECT *
+FROM layoffs_staging3
+ORDER BY 1 ASC;
+
+-- finding highest funding per employee each year
+SELECT company,
+	YEAR(`date`) AS `year`,
+    SUM(total_laid_off) AS total_laid_off,
+    SUM(total_before_layoff) AS total_before_layoff,
+    SUM(funds_raised_millions) AS total_funding_mil,
+	ROUND(SUM(funds_raised_millions * 1000000) / sum(total_before_layoff),3) AS funding_per_emp,
+    ROUND(SUM(total_laid_off) / SUM(total_before_layoff), 4) AS overall_layoff_ratio
+FROM layoffs_staging3
+WHERE total_laid_off IS NOT NULL
+	AND percentage_laid_off IS NOT NULL
+    AND total_before_layoff IS NOT NULL
+    AND funds_raised_millions IS NOT NULL
+    AND percentage_laid_off != 0
+    AND percentage_laid_off !=0
+GROUP BY company, YEAR(`date`)
+ORDER BY funding_per_emp DESC;
+
+-- CTE to refer to
+CREATE TEMPORARY Table temp_company_year_summary
+(
+SELECT company,
+	YEAR(`date`) AS `year`,
+    SUM(total_laid_off) AS total_laid_off,
+    SUM(total_before_layoff) AS total_before_layoff,
+    SUM(funds_raised_millions) AS total_funding_mil,
+	ROUND(SUM(funds_raised_millions) / sum(total_before_layoff),3) AS funding_per_emp,
+    ROUND(SUM(total_laid_off) / SUM(total_before_layoff), 4) AS overall_layoff_ratio
+FROM layoffs_staging3
+WHERE total_laid_off IS NOT NULL
+	AND percentage_laid_off IS NOT NULL
+    AND total_before_layoff IS NOT NULL
+    AND funds_raised_millions IS NOT NULL
+    AND percentage_laid_off != 0
+    AND percentage_laid_off !=0
+GROUP BY company, YEAR(`date`)
+);
+
+SELECT *
+FROM temp_company_year_summary;
+
+SELECT *
+FROM temp_company_year_summary
+WHERE overall_layoff_ratio > 0.3;
+
+SELECT *
+FROM temp_company_year_summary
+ORDER BY total_funding_mil DESC LIMIT 10;
+
+-- rank funding per employee
+SELECT *,
+	RANK() OVER (PARTITION BY `year` ORDER BY funding_per_emp DESC) AS funding_eff_rank
+FROM temp_company_year_summary;
+
+-- find top 5 by funding efficiency per year
+WITH ranked_funding AS
+(
+SELECT *,
+	RANK() OVER (PARTITION BY `year` ORDER BY funding_per_emp DESC) AS funding_eff_rank
+FROM temp_company_year_summary
+)
+SELECT *
+FROM ranked_funding
+WHERE funding_eff_rank <= 5
+ORDER BY `year` DESC, funding_eff_rank;
+
+-- rank company per year by layoff ratio
+WITH ranked_layoff AS (
+	SELECT *,
+		DENSE_RANK() OVER (PARTITION BY `year` ORDER BY overall_layoff_ratio DESC) AS layoff_ratio_rank
+	FROM temp_company_year_summary
+)
+SELECT *
+FROM ranked_layoff
+WHERE layoff_ratio_rank <= 5
+ORDER BY `year` DESC, layoff_ratio_rank;
+
+-- compare high fund with high layoff ratios
+SELECT *
+FROM temp_company_year_summary
+WHERE funding_per_emp > 300000
+	AND overall_layoff_ratio > 0.5
+ORDER BY funding_per_emp DESC;
 
 
-
-
-
+-- compare year over year trends
+SELECT `year`,
+	ROUND(AVG(overall_layoff_ratio), 4) AS avg_layoff_ratio,
+    ROUND(AVG(funding_per_emp), 2) AS avg_funding_per_emp
+FROM temp_company_year_summary
+GROUP BY `year`
+ORDER BY `year`;

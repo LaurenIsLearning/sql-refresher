@@ -52,7 +52,7 @@ DELETE
 FROM duplicate_cte
 WHERE row_num > 1;
 
--- from clicking layoffs_staging > create table
+-- from clicking layoffs_staging > copy to clipboard > create statement
 CREATE TABLE `layoffs_staging2` (
   `company` text,
   `location` text,
